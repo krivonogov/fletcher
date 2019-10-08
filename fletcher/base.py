@@ -207,6 +207,7 @@ class FletcherArray(ExtensionArray):
 
     @property
     def size(self):
+        # type: () -> int
         """
         Number of elements in this array.
 
@@ -214,7 +215,6 @@ class FletcherArray(ExtensionArray):
         -------
         size : int
         """
-        # type: () -> int
         return len(self.data)
 
     @property
@@ -229,6 +229,7 @@ class FletcherArray(ExtensionArray):
         return len(self.shape)
 
     def __len__(self):
+        # type: () -> int
         """
         Length of this array
 
@@ -236,7 +237,6 @@ class FletcherArray(ExtensionArray):
         -------
         length : int
         """
-        # type: () -> int
         return self.shape[0]
 
     @classmethod
