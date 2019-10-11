@@ -191,19 +191,24 @@ class FletcherArray(ExtensionArray):
                     self.__class__.__name__, type(array)
                 )
             )
+        self.data.validate()
         self._dtype = FletcherDtype(self.data.type)
-        self.offsets = self._calculate_chunk_offsets()
 
     @property
     def dtype(self):
         # type: () -> ExtensionDtype
         return self._dtype
 
-    def __array__(self, copy=None):
+    def __len__(self):
         """
-        Correctly construct numpy arrays when passed to `np.asarray()`.
+        Length of this array
+
+        Returns
+        -------
+        length : int
         """
-        return pa.column("dummy", self.data).to_pandas().values
+        # type: () -> int
+        return len(self.data)
 
     @property
     def size(self):
@@ -215,29 +220,19 @@ class FletcherArray(ExtensionArray):
         size : int
         """
         # type: () -> int
-        return len(self.data)
+        return len(self)
 
     @property
     def shape(self):
         # type: () -> Tuple[int]
         # This may be patched by pandas to support pseudo-2D operations.
-        return (self.size,)
+        return (len(self),)
 
-    @property
-    def ndim(self):
-        # type: () -> int
-        return len(self.shape)
-
-    def __len__(self):
+    def __array__(self, copy=None):
         """
-        Length of this array
-
-        Returns
-        -------
-        length : int
+        Correctly construct numpy arrays when passed to `np.asarray()`.
         """
-        # type: () -> int
-        return self.shape[0]
+        return np.asarray(self.data)
 
     @classmethod
     def _concat_same_type(cls, to_concat):
@@ -258,25 +253,6 @@ class FletcherArray(ExtensionArray):
                 [array for ea in to_concat for array in ea.data.iterchunks()]
             )
         )
-
-    def _calculate_chunk_offsets(self):
-        """
-        Returns an array holding the indices pointing to the first element of each chunk
-        """
-        offset = 0
-        offsets = []
-        for chunk in self.data.iterchunks():
-            offsets.append(offset)
-            offset += len(chunk)
-        return np.array(offsets)
-
-    def _get_chunk_indexer(self, array):
-        """
-        Returns an array with the chunk number for each index
-        """
-        if self.data.num_chunks == 1:
-            return np.broadcast_to(0, len(array))
-        return np.digitize(array, self.offsets[1:])
 
     def _reduce(self, name, skipna=True, **kwargs):
         """
@@ -312,90 +288,6 @@ class FletcherArray(ExtensionArray):
                 name=name, dtype=self.dtype
             )
         )
-
-    def __setitem__(self, key, value):
-        # type: (Union[int, np.ndarray], Any) -> None
-        """Set one or more values inplace.
-
-        Parameters
-        ----------
-        key : int, ndarray, or slice
-            When called from, e.g. ``Series.__setitem__``, ``key`` will be
-            one of
-
-            * scalar int
-            * ndarray of integers.
-            * boolean ndarray
-            * slice object
-
-        value : ExtensionDtype.type, Sequence[ExtensionDtype.type], or object
-            value or values to be set of ``key``.
-
-        Returns
-        -------
-        None
-        """
-        # Convert all possible input key types to an array of integers
-        if is_bool_dtype(key):
-            key = np.argwhere(key).flatten()
-        elif isinstance(key, slice):
-            key = np.array(range(len(self))[key])
-        elif is_integer(key):
-            key = np.array([key])
-        else:
-            key = np.asanyarray(key)
-
-        if pd.api.types.is_scalar(value):
-            value = np.broadcast_to(value, len(key))
-        else:
-            value = np.asarray(value)
-
-        if len(key) != len(value):
-            raise ValueError("Length mismatch between index and value.")
-
-        affected_chunks_index = self._get_chunk_indexer(key)
-        affected_chunks_unique = np.unique(affected_chunks_index)
-
-        all_chunks = list(self.data.iterchunks())
-
-        for ix, offset in zip(
-            affected_chunks_unique, self.offsets[affected_chunks_unique]
-        ):
-            chunk = all_chunks[ix]
-
-            # Translate the array-wide indices to indices of the chunk
-            key_chunk_indices = np.argwhere(affected_chunks_index == ix).flatten()
-            array_chunk_indices = key[key_chunk_indices] - offset
-
-            if pa.types.is_date64(self.dtype.arrow_dtype):
-                # ARROW-2741: pa.array from np.datetime[D] and type=pa.date64 produces invalid results
-                arr = np.array(chunk.to_pylist())
-                arr[array_chunk_indices] = np.array(value)[key_chunk_indices]
-                pa_arr = pa.array(arr, self.dtype.arrow_dtype)
-            else:
-                arr = chunk.to_pandas()
-                # In the case where we zero-copy Arrow to Pandas conversion, the
-                # the resulting arrays are read-only.
-                if not arr.flags.writeable:
-                    arr = arr.copy()
-                arr[array_chunk_indices] = value[key_chunk_indices]
-
-                mask = None
-                # ARROW-2806: Inconsistent handling of np.nan requires adding a mask
-                if (
-                    pa.types.is_integer(self.dtype.arrow_dtype)
-                    or pa.types.is_floating(self.dtype.arrow_dtype)
-                    or pa.types.is_boolean(self.dtype.arrow_dtype)
-                ):
-                    nan_values = pd.isna(value[key_chunk_indices])
-                    if any(nan_values):
-                        nan_index = key_chunk_indices & nan_values
-                        mask = np.ones_like(arr, dtype=bool)
-                        mask[nan_index] = False
-                pa_arr = pa.array(arr, self.dtype.arrow_dtype, mask=mask)
-            all_chunks[ix] = pa_arr
-
-        self.data = pa.chunked_array(all_chunks)
 
     def __getitem__(self, item):
         # type (Any) -> Any
@@ -473,6 +365,9 @@ class FletcherArray(ExtensionArray):
         """
         return extract_isnull_bytemap(self.data)
 
+    def _concat_arrays_inplace(self):
+        self.data = pa.chunked_array([pa.concat_arrays(self.data)])
+
     def copy(self, deep=False):
         # type: (bool) -> ExtensionArray
         """
@@ -487,9 +382,8 @@ class FletcherArray(ExtensionArray):
         -------
         ExtensionArray
         """
-        if deep:
-            raise NotImplementedError("Deep copy is not supported")
-        return type(self)(self.data)
+        data = self.data.cast(self.data.type) if deep else self.data
+        return type(self)(data)
 
     @property
     def nbytes(self):
@@ -497,12 +391,7 @@ class FletcherArray(ExtensionArray):
         """
         The number of bytes needed to store this object in memory.
         """
-        size = 0
-        for chunk in self.data.chunks:
-            for buf in chunk.buffers():
-                if buf is not None:
-                    size += buf.size
-        return size
+        return sum(buf.size for chunk in self.data.chunks for buf in chunk.buffers() if buf is not None)
 
     @property
     def base(self):
@@ -510,6 +399,9 @@ class FletcherArray(ExtensionArray):
         the base object of the underlying data
         """
         return self.data
+
+    def unique(self):
+        return type(self)(self.data.unique())
 
     def factorize(self, na_sentinel=-1):
         # type: (int) -> Tuple[np.ndarray, ExtensionArray]
