@@ -232,7 +232,7 @@ class FletcherArray(ExtensionArray):
         """
         Correctly construct numpy arrays when passed to `np.asarray()`.
         """
-        return np.asarray(self.data)
+        return np.array(self.data, copy=copy)
 
     @classmethod
     def _concat_same_type(cls, to_concat):
@@ -366,7 +366,7 @@ class FletcherArray(ExtensionArray):
         return extract_isnull_bytemap(self.data)
 
     def _concat_arrays_inplace(self):
-        self.data = pa.chunked_array([pa.concat_arrays(self.data)])
+        self.data = pa.chunked_array([pa.concat_arrays(self.data.chunks)])
 
     def copy(self, deep=False):
         # type: (bool) -> ExtensionArray
