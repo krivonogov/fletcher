@@ -195,6 +195,15 @@ class FletcherArray(ExtensionArray):
         self._dtype = FletcherDtype(self.data.type)
 
     @property
+    def _is_single_chunk(self):
+        return self.data.num_chunks == 1
+
+    def _concat_arrays_inplace(self):
+        if not self._is_single_chunk:
+            self.data = pa.chunked_array([pa.concat_arrays(self.data.chunks)])
+        assert self._is_single_chunk
+
+    @property
     def dtype(self):
         # type: () -> ExtensionDtype
         return self._dtype
@@ -210,29 +219,11 @@ class FletcherArray(ExtensionArray):
         # type: () -> int
         return len(self.data)
 
-    @property
-    def size(self):
+    def __array__(self, dtype=None):
         """
-        Number of elements in this array.
-
-        Returns
-        -------
-        size : int
+        Construct numpy arrays when passed to `np.asarray()`.
         """
-        # type: () -> int
-        return len(self)
-
-    @property
-    def shape(self):
-        # type: () -> Tuple[int]
-        # This may be patched by pandas to support pseudo-2D operations.
-        return (len(self),)
-
-    def __array__(self, copy=None):
-        """
-        Correctly construct numpy arrays when passed to `np.asarray()`.
-        """
-        return np.array(self.data, copy=copy)
+        return np.asarray(self.data, dtype=dtype)
 
     @classmethod
     def _concat_same_type(cls, to_concat):
@@ -365,9 +356,6 @@ class FletcherArray(ExtensionArray):
         """
         return extract_isnull_bytemap(self.data)
 
-    def _concat_arrays_inplace(self):
-        self.data = pa.chunked_array([pa.concat_arrays(self.data.chunks)])
-
     def copy(self, deep=False):
         # type: (bool) -> ExtensionArray
         """
@@ -391,7 +379,8 @@ class FletcherArray(ExtensionArray):
         """
         The number of bytes needed to store this object in memory.
         """
-        return sum(buf.size for chunk in self.data.chunks for buf in chunk.buffers() if buf is not None)
+        return sum(buf.size for chunk in self.data.chunks
+                   for buf in chunk.buffers() if buf is not None)
 
     @property
     def base(self):
