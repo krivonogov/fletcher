@@ -192,7 +192,7 @@ class FletcherArray(ExtensionArray):
                     self.__class__.__name__, type(array)
                 )
             )
-        self.data.validate()
+        # self.data.validate()
         self._dtype = FletcherDtype(self.data.type)
 
     @property
