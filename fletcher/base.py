@@ -664,6 +664,9 @@ def to_numpy(array: pa.Array, null_value=None, clean: bool = False) -> np.ndarra
     >>> a.to_numpy(clean=True)
     array([ 5,  7, 13])
     """
+    if len(array) == 0:
+        return array.to_numpy()
+
     if array.null_count and (null_value is None and not clean):
         raise ValueError("null_value must be specified if an array contains nulls")
 
