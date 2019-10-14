@@ -10,6 +10,7 @@ from typing import Any, Optional, Sequence, Tuple, Union
 import numpy as np
 import pandas as pd
 import pyarrow as pa
+
 import six
 from pandas.api.types import (
     is_array_like,
@@ -639,6 +640,7 @@ def pandas_from_arrow(arrow_object):
         )
 
 
+
 def to_numpy(array, null_value=None, clean: bool = False) -> np.ndarray:
     """
     Return a NumPy view of this array
@@ -667,9 +669,9 @@ def to_numpy(array, null_value=None, clean: bool = False) -> np.ndarray:
         raise ValueError("null_value must be specified if an array contains nulls")
 
     read_buffer_dtype, res_dtype = None, None
-    if is_timestamp(array.type):
+    if pa.types.is_timestamp(array.type):
         read_buffer_dtype = np.dtype(f"datetime64[{array.type.unit}]")
-    elif is_date(array.type):
+    elif pa.types.is_date(array.type):
         # we need to read buffer with int of a corresponding size and then transform res to datetime64[...] dtype
         read_buffer_dtype = np.dtype(f"int{DATES_TYPE_SIZE[array.type]}")
         res_dtype = np.dtype(f"datetime64[{DATES_TYPE_OUTPUT_DTYPE[array.type]}]")
@@ -679,7 +681,7 @@ def to_numpy(array, null_value=None, clean: bool = False) -> np.ndarray:
     length = len(array)
     not_null_mask = array.not_null_mask
     null_mask = np.logical_not(not_null_mask)
-    if not is_primitive(array.type) or is_boolean(array.type):
+    if not pa.types.is_primitive(array.type) or pa.types.is_boolean(array.type):
         res = np.empty(length, dtype=read_buffer_dtype)
         res[not_null_mask] = array[not_null_mask].to_pandas()
     else:
@@ -687,7 +689,7 @@ def to_numpy(array, null_value=None, clean: bool = False) -> np.ndarray:
         assert len(buflist) == 2
         # doing view here !
         res = np.frombuffer(buflist[-1], dtype=read_buffer_dtype)[
-            array.offset : array.offset + length
+            array.offset: array.offset + length
         ]
     if res_dtype is not None:
         res = res.astype(res_dtype)
