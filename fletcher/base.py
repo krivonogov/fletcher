@@ -225,6 +225,10 @@ class FletcherArray(ExtensionArray):
         """
         return np.asarray(self.data, dtype=dtype)
 
+    def __arrow_array__(self):
+        self._concat_arrays_inplace()
+        return self.data.chunks(0)
+
     @classmethod
     def _concat_same_type(cls, to_concat):
         # type: (Sequence[ExtensionArray]) -> ExtensionArray
@@ -423,19 +427,13 @@ class FletcherArray(ExtensionArray):
         """
         if pa.types.is_dictionary(self.data.type):
             raise NotImplementedError()
-        elif self.data.num_chunks == 1:
-            # Dictionaryencode and do the same as above
-            encoded = self.data.chunk(0).dictionary_encode()
-            indices = encoded.indices.to_pandas()
-            if indices.dtype.kind == "f":
-                indices[np.isnan(indices)] = na_sentinel
-                indices = indices.astype(int)
-            if not is_int64_dtype(indices):
-                indices = indices.astype(np.int64)
-            return indices, type(self)(encoded.dictionary)
-        else:
-            np_array = pa.column("dummy", self.data).to_pandas().values
-            return pd.factorize(np_array, na_sentinel=na_sentinel)
+
+        self._concat_arrays_inplace()
+        encoded = self.data.chunk(0).dictionary_encode()
+        return (
+            to_numpy(encoded.indices, null_value=na_sentinel),
+            type(self)(encoded.dictionary),
+        )
 
     def astype(self, dtype, copy=True):
         """
@@ -639,3 +637,61 @@ def pandas_from_arrow(arrow_object):
         raise NotImplementedError(
             "Objects of type {} are not supported".format(type(arrow_object))
         )
+
+
+def to_numpy(array, null_value=None, clean: bool = False) -> np.ndarray:
+    """
+    Return a NumPy view of this array
+    Only primitive arrays with the same memory layout as NumPy (i.e. integers, floating point) are supported
+    From https://github.com/apache/arrow/blob/master/python/pyarrow/array.pxi#L842
+
+    DISCLAIMER :
+    for most array classes we will return a view on buffer data, and replace null values inplace
+    for now we haven't found any problem with this approach, but it can potentially break in future
+
+    :param null_value: value to use to replace nulls in original array
+    :param clean: boolean to return only "clean" part of an array, without nulls
+
+    Example :
+    >>> a = ArrayInterface(pa.array([5, 7, None, None, 13]))
+    >>> a.to_numpy()  # doctest: +ELLIPSIS, +NORMALIZE_WHITESPACE
+    Traceback (most recent call last):
+      ...
+    ValueError: null_value must be specified if an array contains nulls
+    >>> a.to_numpy(-1)
+    array([ 5,  7, -1, -1, 13])
+    >>> a.to_numpy(clean=True)
+    array([ 5,  7, 13])
+    """
+    if array.null_count and (null_value is None and not clean):
+        raise ValueError("null_value must be specified if an array contains nulls")
+
+    read_buffer_dtype, res_dtype = None, None
+    if is_timestamp(array.type):
+        read_buffer_dtype = np.dtype(f"datetime64[{array.type.unit}]")
+    elif is_date(array.type):
+        # we need to read buffer with int of a corresponding size and then transform res to datetime64[...] dtype
+        read_buffer_dtype = np.dtype(f"int{DATES_TYPE_SIZE[array.type]}")
+        res_dtype = np.dtype(f"datetime64[{DATES_TYPE_OUTPUT_DTYPE[array.type]}]")
+    else:
+        read_buffer_dtype = array.type.to_pandas_dtype()
+
+    length = len(array)
+    not_null_mask = array.not_null_mask
+    null_mask = np.logical_not(not_null_mask)
+    if not is_primitive(array.type) or is_boolean(array.type):
+        res = np.empty(length, dtype=read_buffer_dtype)
+        res[not_null_mask] = array[not_null_mask].to_pandas()
+    else:
+        buflist = array.buffers()
+        assert len(buflist) == 2
+        # doing view here !
+        res = np.frombuffer(buflist[-1], dtype=read_buffer_dtype)[
+            array.offset : array.offset + length
+        ]
+    if res_dtype is not None:
+        res = res.astype(res_dtype)
+    if clean:
+        return res[not_null_mask]
+    res[null_mask] = null_value
+    return res
