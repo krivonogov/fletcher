@@ -431,8 +431,10 @@ class FletcherArray(ExtensionArray):
 
         self._concat_arrays_inplace()
         encoded = self.data.chunk(0).dictionary_encode()
+        # need to cast as a workaround for https://issues.apache.org/jira/browse/ARROW-6882
+        # we could make a view as well ...
         return (
-            to_numpy(encoded.indices, null_value=na_sentinel),
+            to_numpy(encoded.indices.cast(pa.int64), null_value=na_sentinel),
             type(self)(encoded.dictionary),
         )
 
