@@ -681,8 +681,8 @@ def to_numpy(array: pa.Array, null_value=None, clean: bool = False) -> np.ndarra
         read_buffer_dtype = array.type.to_pandas_dtype()
 
     length = len(array)
-    # view as a workaround for https://issues.apache.org/jira/browse/ARROW-6882
-    null_mask = extract_isnull_bytemap(pa.chunked_array([array.view(array.type)]))
+    # view as a workaround for https://issues.apache.org/jira/browse/ARROW-6882  \ .view(array.type)
+    null_mask = extract_isnull_bytemap(pa.chunked_array([array]))
     not_null_mask = np.logical_not(null_mask)
 
     if not pa.types.is_primitive(array.type) or pa.types.is_boolean(array.type):
