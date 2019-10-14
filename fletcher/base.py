@@ -640,8 +640,7 @@ def pandas_from_arrow(arrow_object):
         )
 
 
-
-def to_numpy(array, null_value=None, clean: bool = False) -> np.ndarray:
+def to_numpy(array: pa.Array, null_value=None, clean: bool = False) -> np.ndarray:
     """
     Return a NumPy view of this array
     Only primitive arrays with the same memory layout as NumPy (i.e. integers, floating point) are supported
