@@ -379,8 +379,12 @@ class FletcherArray(ExtensionArray):
         """
         The number of bytes needed to store this object in memory.
         """
-        return sum(buf.size for chunk in self.data.chunks
-                   for buf in chunk.buffers() if buf is not None)
+        return sum(
+            buf.size
+            for chunk in self.data.chunks
+            for buf in chunk.buffers()
+            if buf is not None
+        )
 
     @property
     def base(self):
