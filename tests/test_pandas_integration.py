@@ -204,29 +204,3 @@ def test_fillna_chunked(test_array_chunked):
     expected = pd.Series(fr.FletcherArray(chunked_exp))
 
     tm.assert_series_equal(ser, expected)
-
-
-def test_setitem_chunked(test_array_chunked):
-    ser = pd.Series(fr.FletcherArray(test_array_chunked))
-    new_val = "new_value"
-    old_val = ser[15]
-    assert new_val != old_val
-    ser[15] = new_val
-    assert new_val == ser[15]
-
-
-def test_setitem_chunked_bool_index(test_array_chunked):
-    ser = pd.Series(fr.FletcherArray(test_array_chunked))
-    bool_index = np.full(len(ser), False)
-    bool_index[15] = True
-    ser[bool_index] = "bool_value"
-    assert ser[15] == "bool_value"
-
-
-@pytest.mark.parametrize("indices", [[10, 15], [10, 11]])
-def test_setitem_chunked_int_index(indices, test_array_chunked):
-    ser = pd.Series(fr.FletcherArray(test_array_chunked))
-    integer_index = indices
-    ser[integer_index] = ["int", "index"]
-    assert ser[indices[0]] == "int"
-    assert ser[indices[1]] == "index"
