@@ -26,7 +26,6 @@ from pandas.tests.extension.base import (  # BaseArithmeticOpsTests,; BaseCompar
     BaseParsingTests,
     BasePrintingTests,
     BaseReshapingTests,
-    BaseSetitemTests,
 )
 
 
@@ -431,10 +430,6 @@ class TestBaseReshapingTests(BaseReshapingTests):
 
     def test_merge(self, data, na_value):
         BaseReshapingTests.test_merge(self, data, na_value)
-
-
-class TestBaseSetitemTests(BaseSetitemTests):
-    pass
 
 
 class TestBaseParsingTests(BaseParsingTests):

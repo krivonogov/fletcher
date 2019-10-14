@@ -98,13 +98,6 @@ def test_getitem_slice():
     tm.assert_series_equal(result, expected)
 
 
-def test_setitem_scalar():
-    ser = pd.Series(fr.FletcherArray(TEST_ARRAY))
-    ser[1] = "other_string"
-    expected = pd.Series(fr.FletcherArray(pa.array(["Test", "other_string", None])))
-    tm.assert_series_equal(ser, expected)
-
-
 def test_isnull():
     df = pd.DataFrame({"A": fr.FletcherArray(TEST_ARRAY)})
 

@@ -103,9 +103,3 @@ class Indexing(object):
 
     def time_getitem_obj(self, chunked, value, indices):
         self.df["str"][self.indexer]
-
-    def time_setitem(self, chunked, value, indices):
-        self.df_ext["str"][self.indexer] = self.value
-
-    def time_setitem_obj(self, chunked, value, indices):
-        self.df["str"][self.indexer] = self.value
