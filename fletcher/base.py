@@ -434,7 +434,7 @@ class FletcherArray(ExtensionArray):
         # need to cast as a workaround for https://issues.apache.org/jira/browse/ARROW-6882
         # we could make a view as well ...
         return (
-            to_numpy(encoded.indices.cast(pa.int64), null_value=na_sentinel),
+            to_numpy(encoded.indices.cast(pa.int64()), null_value=na_sentinel),
             type(self)(encoded.dictionary),
         )
 
