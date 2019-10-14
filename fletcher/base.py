@@ -688,7 +688,7 @@ def to_numpy(array: pa.Array, null_value=None, clean: bool = False) -> np.ndarra
         assert len(buflist) == 2
         # doing view here !
         res = np.frombuffer(buflist[-1], dtype=read_buffer_dtype)[
-            array.offset: array.offset + length
+            array.offset : array.offset + length
         ]
     if res_dtype is not None:
         res = res.astype(res_dtype)
