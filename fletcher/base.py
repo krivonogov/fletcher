@@ -678,8 +678,9 @@ def to_numpy(array: pa.Array, null_value=None, clean: bool = False) -> np.ndarra
         read_buffer_dtype = array.type.to_pandas_dtype()
 
     length = len(array)
-    not_null_mask = array.not_null_mask
-    null_mask = np.logical_not(not_null_mask)
+    null_mask = extract_isnull_bytemap(pa.chunked_array([array]))
+    not_null_mask = np.logical_not(null_mask)
+
     if not pa.types.is_primitive(array.type) or pa.types.is_boolean(array.type):
         res = np.empty(length, dtype=read_buffer_dtype)
         res[not_null_mask] = array[not_null_mask].to_pandas()
