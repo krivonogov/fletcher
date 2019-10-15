@@ -432,7 +432,7 @@ class FletcherArray(ExtensionArray):
         self._concat_arrays_inplace()
         encoded = self.data.chunk(0).dictionary_encode()
         return (
-            to_numpy(encoded.indices, null_value=na_sentinel),
+            to_numpy(encoded.indices.cast(pa.int64()), null_value=na_sentinel),
             type(self)(encoded.dictionary),
         )
 
