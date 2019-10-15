@@ -71,4 +71,5 @@ the formatting is reproducible.
 
 
 ## License
-[![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Fxhochy%2Ffletcher.svg?type=large)](https://app.fossa.io/projects/git%2Bgithub.com%2Fxhochy%2Ffletcher?ref=badge_large)
+[![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Fxhochy%2Ffletcher.svg?type=large)](https://app.fossa.io/projects/git%2Bgithub.com%2Fxhochy%2Ffletcher?ref=badge_large) 
+ 
