@@ -719,10 +719,13 @@ class FletcherArray(ExtensionArray):
             if not np.any(indices < 0):
                 allow_fill = False
         if isinstance(indices,slice) and allow_fill:
-            Raise Exception('allow_fill cannot be used with slice')
+            raise ValueError('allow_fill cannot be used with slice')
 
         if not allow_fill:
             indices = self._indices_to_numpy_array(indices)
+            if self.data.num_chunks==1:
+                return(FletcherArray(self.data.chunk(0).take(indices)))
+
             lengths = np.fromiter(map(len, self.data.chunks), dtype=np.int64)
             cum_lengths = lengths.cumsum()
 
@@ -740,7 +743,7 @@ class FletcherArray(ExtensionArray):
 
             def take_in_one_chunk(i_chunk):
                 array_idx = indices[limits_idx[i_chunk]:limits_idx[i_chunk + 1]] - cum_lengths[i_chunk]
-                return self.data.chunk(i_chunk).take(pa.array(array_idx))#this is a pa.Array
+                return self.data.chunk(i_chunk).take(pa.array(array_idx))#this is a pyarrow.Array
 
             result = take_in_one_chunk(0) if self.data.num_chunks == 1 else [take_in_one_chunk(i) for i in range(self.data.num_chunks)]
 
@@ -751,10 +754,10 @@ class FletcherArray(ExtensionArray):
 
         if allow_fill:
             if fill_value is None:
-                raise Exception('fill_value must be given')
+                raise ValueError('fill_value must be given')
             error_mask = indices < -1
             if np.any(error_mask):
-                raise Exception('Since allow_fill is True, there cannot be any indices < -1')
+                raise ValueError('Since allow_fill is True, there cannot be any indices < -1')
             return self._concat_same_type([self, FletcherArray([fill_value], dtype=self.data.type)]).take(indices)
 
 
