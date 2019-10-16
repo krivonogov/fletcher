@@ -724,7 +724,7 @@ class FletcherArray(ExtensionArray):
         if not allow_fill:
             indices = self._indices_to_numpy_array(indices)
             if self.data.num_chunks==1:
-                return(FletcherArray(self.data.chunk(0).take(indices)))
+                return(FletcherArray(self.data.chunk(0).take(pa.array(indices))))
 
             lengths = np.fromiter(map(len, self.data.chunks), dtype=np.int64)
             cum_lengths = lengths.cumsum()
@@ -745,7 +745,7 @@ class FletcherArray(ExtensionArray):
                 array_idx = indices[limits_idx[i_chunk]:limits_idx[i_chunk + 1]] - cum_lengths[i_chunk]
                 return self.data.chunk(i_chunk).take(pa.array(array_idx))#this is a pyarrow.Array
 
-            result = take_in_one_chunk(0) if self.data.num_chunks == 1 else [take_in_one_chunk(i) for i in range(self.data.num_chunks)]
+            result = [take_in_one_chunk(i) for i in range(self.data.num_chunks)] #we know that self.data.num_chunks >1
 
             if sort_idx is None:
                 return FletcherArray(pa.chunked_array(result))
